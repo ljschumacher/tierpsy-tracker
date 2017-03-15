@@ -55,7 +55,6 @@ def getStraightenWormInt(worm_img, skeleton, half_width, width_resampling):
 
     '''
 
-    assert half_width > 0
     assert not np.any(np.isnan(skeleton))
 
     dX = np.diff(skeleton[:, 0])
@@ -260,7 +259,7 @@ def getIntensityProfile(
                     img, row_data['coord_x'], row_data['coord_y'], row_data['roi_size'])
                 skeleton = skel_tab[skeleton_id, :, :] - roi_corner
 
-                half_width = np.minimum(1.0, skel_width_tab[skeleton_id] / 2) #make sure the half width has a valid dimension for the straighten worm
+                half_width = skel_width_tab[skeleton_id] / 2
 
                 assert not np.isnan(skeleton[0, 0])
 
