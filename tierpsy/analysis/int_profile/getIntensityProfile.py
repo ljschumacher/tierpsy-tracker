@@ -260,6 +260,7 @@ def getIntensityProfile(
                 skeleton = skel_tab[skeleton_id, :, :] - roi_corner
 
                 half_width = skel_width_tab[skeleton_id] / 2
+
                 assert not np.isnan(skeleton[0, 0])
 
                 skel_smooth = smoothSkeletons(
