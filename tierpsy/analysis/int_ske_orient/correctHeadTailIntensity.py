@@ -352,8 +352,6 @@ def correctHeadTailIntWorm(
         top_part = worm_int_profile[:,1:segmentIndex].astype(np.float)
         bot_part = worm_int_profile[:,-segmentIndex:].astype(np.float)
         # get the difference between the max of the first part and the min of the last part of skeleton
-        #diff_ori = np.abs(np.median(top_part, axis=1) - np.min(bot_part, axis=1)) # diff_inv should be high when the orientation is correct
-        #diff_inv = np.abs(np.min(top_part, axis=1) - np.max(bot_part, axis=1)) # diff_ori should be high when the orientation is incorrect
         diff_inv = np.median(top_part, axis=1) - np.median(bot_part, axis=1) #diff_inv should be high when the orientation is correct
         diff_ori = 0
 
