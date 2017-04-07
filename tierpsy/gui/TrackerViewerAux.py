@@ -9,16 +9,13 @@ from PyQt5.QtCore import QPointF, Qt
 from PyQt5.QtGui import QPixmap, QImage, QPolygonF, QPen, QPainter, QColor
 from PyQt5.QtWidgets import QApplication, QFileDialog
 
-from tierpsy.gui.HDF5VideoPlayer import HDF5VideoPlayer_GUI, lineEditDragDrop
+from tierpsy.gui.HDF5VideoPlayer import HDF5VideoPlayerGUI, LineEditDragDrop
 from tierpsy.gui.TrackerViewerAux_ui import Ui_TrackerViewerAux
 from tierpsy.analysis.ske_create.getSkeletonsTables import getWormMask
 from tierpsy.analysis.ske_create.segWormPython.mainSegworm import getSkeleton
 
 
-#from scipy.signal import savgol_filter
-
-
-class TrackerViewerAux_GUI(HDF5VideoPlayer_GUI):
+class TrackerViewerAuxGUI(HDF5VideoPlayerGUI):
 
     def __init__(self, ui=''):
         if not ui:
@@ -28,13 +25,12 @@ class TrackerViewerAux_GUI(HDF5VideoPlayer_GUI):
 
         self.results_dir = ''
         self.skeletons_file = ''
-        self.frame_number = -1
-        self.trajectories_data = pd.DataFrame()
-        self.traj_time_grouped = -1
+        self.trajectories_data = None
+        self.traj_time_grouped = None
         self.frame_save_interval = 1 
 
         self.ui.pushButton_skel.clicked.connect(self.getSkelFile)
-        lineEditDragDrop(
+        LineEditDragDrop(
             self.ui.lineEdit_skel,
             self.updateSkelFile,
             os.path.isfile)
@@ -75,8 +71,8 @@ class TrackerViewerAux_GUI(HDF5VideoPlayer_GUI):
                     self.strel_size = 5
 
         except (IOError, KeyError):
-            self.trajectories_data = pd.DataFrame()
-            self.traj_time_grouped = -1
+            self.trajectories_data = None
+            self.traj_time_grouped = None
             self.skel_dat = {}
 
         if self.frame_number == 0:
@@ -93,7 +89,7 @@ class TrackerViewerAux_GUI(HDF5VideoPlayer_GUI):
 
     def updateVideoFile(self, vfilename):
         super().updateVideoFile(vfilename)
-        if type(self.image_group) is int:
+        if self.image_group is None:
             return
 
         #find if it is a fluorescence image
@@ -127,15 +123,14 @@ class TrackerViewerAux_GUI(HDF5VideoPlayer_GUI):
 
     def getFrameData(self, frame_number):
         try:
-            if not isinstance(self.traj_time_grouped,
-                pd.core.groupby.DataFrameGroupBy):
+            if not isinstance(self.traj_time_grouped, pd.core.groupby.DataFrameGroupBy):
                 raise KeyError
             
             frame_data = self.traj_time_grouped.get_group(self.frame_save_interval*frame_number)
             return frame_data
 
         except KeyError:
-            return pd.DataFrame()
+            return None
 
     def drawSkelResult(self, img, qimg, row_data, isDrawSkel, 
         roi_corner=(0,0), read_center=True):
@@ -157,8 +152,7 @@ class TrackerViewerAux_GUI(HDF5VideoPlayer_GUI):
         return qimg
 
     def drawSkel(self, worm_img, worm_qimg, row_data, roi_corner=(0, 0)):
-        if not self.skeletons_file or not isinstance(
-                self.trajectories_data, pd.DataFrame):
+        if not self.skeletons_file or self.trajectories_data is None:
             return
 
         c_ratio_y = worm_qimg.width() / worm_img.shape[1]
@@ -272,7 +266,7 @@ class TrackerViewerAux_GUI(HDF5VideoPlayer_GUI):
 if __name__ == '__main__':
     app = QApplication(sys.argv)
 
-    ui = TrackerViewerAux_GUI()
+    ui = TrackerViewerAuxGUI()
     ui.show()
 
     sys.exit(app.exec_())

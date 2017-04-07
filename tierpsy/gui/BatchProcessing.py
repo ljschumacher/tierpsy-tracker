@@ -8,14 +8,14 @@ from tierpsy.processing.processMultipleFilesFun import processMultipleFilesFun, 
 from tierpsy.processing.batchProcHelperFunc import getDefaultSequence
 
 from tierpsy.gui.AnalysisProgress import AnalysisProgress, WorkerFunQt
-from tierpsy.gui.HDF5VideoPlayer import lineEditDragDrop
+from tierpsy.gui.HDF5VideoPlayer import LineEditDragDrop
 from tierpsy.gui.BatchProcessing_ui import Ui_BatchProcessing
 
 from tierpsy.processing.ProcessMultipleFilesParser import CompressMultipleFilesParser, TrackMultipleFilesParser
 DFLT_COMPRESS_VALS = CompressMultipleFilesParser.dflt_vals
 DFLT_TRACK_VALS = TrackMultipleFilesParser.dflt_vals
 
-from tierpsy.helper import TrackerParams
+from tierpsy.helper.params import TrackerParams
 
 #get default parameters files
 from tierpsy import DFLT_PARAMS_PATH, DFLT_PARAMS_FILES
@@ -70,28 +70,28 @@ class BatchProcessing_GUI(QMainWindow):
             'max_num_process'] == DFLT_TRACK_VALS['max_num_process']
         assert DFLT_COMPRESS_VALS[
             'tmp_dir_root'] == DFLT_TRACK_VALS['tmp_dir_root']
-        lineEditDragDrop(
+        LineEditDragDrop(
             self.ui.lineEdit_txtFileList,
             self.updateTxtFileList,
             os.path.isfile)
-        lineEditDragDrop(
+        LineEditDragDrop(
             self.ui.lineEdit_videosDir,
             self.updateVideosDir,
             os.path.isdir)
-        lineEditDragDrop(
+        LineEditDragDrop(
             self.ui.lineEdit_masksDir,
             self.updateMasksDir,
             os.path.isdir)
-        lineEditDragDrop(
+        LineEditDragDrop(
             self.ui.lineEdit_resultsDir,
             self.updateResultsDir,
             os.path.isdir)
-        lineEditDragDrop(
+        LineEditDragDrop(
             self.ui.lineEdit_tmpDir,
             self.updateTmpDir,
             os.path.isdir)
 
-        lineEditDragDrop(
+        LineEditDragDrop(
             self.ui.comboBox_paramFile,
             self.updateParamFile,
             os.path.isfile)
