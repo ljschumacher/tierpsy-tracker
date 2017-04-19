@@ -27,8 +27,8 @@ function osx_dependencies {
 	#brew upgrade
 
 	#ffmpeg libraries, needed to install opencv
-	brew install ffmpeg --verbose --with-fdk-aac --with-libass --with-libquvi \
-	--with-libvorbis --with-libvpx --with-x265 --with-openh264 --with-tools --with-fdk-aac
+	brew install ffmpeg --verbose --with-fdk-aac --with-libass --with-libquvi --with-libvorbis --with-libvpx \
+	 --with-x265 --with-openh264 --with-tools --with-fdk-aac
 	#image libraries for opencv
 	brew install jpeg libpng libtiff openexr eigen tbb
 	brew install git
@@ -147,29 +147,29 @@ function redhat_dependencies {
 function anaconda_pkgs {
 	echo "Installing get_anaconda extra packages..."
 	#conda install -y python=3.5.3 pip
-	conda install -y numpy matplotlib pytables pandas \
+	conda install -y numpy matplotlib pytables pandas gitpython pyqt \
 	h5py scipy scikit-learn scikit-image seaborn xlrd cython statsmodels
-	pip install gitpython pyqt5 keras 
 	conda install -y -c conda-forge tensorflow
+	pip install keras 
+
 }
 
 function build_opencv3_anaconda {
 	echo "Installing openCV..."
-	
 	conda install -y anaconda-client conda-build 
-	#conda config --add channels menpo
-
+	
+	rm -rf ./install_opencv3_conda
 	git clone https://github.com/ver228/install_opencv3_conda 
 	conda build install_opencv3_conda
 	
 	conda build --no-anaconda-upload installation/install_opencv3_conda
-	#conda install -f --use-local ~/miniconda3/conda-bld/linux-64/opencv3-3.2.0-0.tar.bz2
 	conda install -y -f --use-local opencv3
 	python3 -c "import cv2; print(cv2.__version__)"
 	rm -Rf install_opencv3_conda/
 }
 
 function opencv_anaconda {
+	conda config --add channels menpo
 	read -r -p "Would you like to compile openCV? Otherwise I will try to download a previously compiled version that might not be compatible with your system. [y/N] " response
 	case "$response" in [yY][eE][sS]|[yY])
 		OPENCV_CUR_VER=`python3 -c "import cv2; print(cv2.__version__)" 2>/dev/null` || true
@@ -268,7 +268,16 @@ function download_examples {
 
 function link_desktop {
 	DESKTOLINK="$HOME/Desktop/TierpsyTracker.command"
-	echo "python3 $MW_MAIN_DIR/MWTracker_GUI/MWConsole.py; exit" > $DESKTOLINK
+	
+	if [[ "${OS}" -eq "Darwin" ]]
+	then
+		EXIT_CMD="osascript -e 'tell application "Terminal" to close first window' & exit"
+	else
+		EXIT_CMD="exit"
+	fi
+
+	echo "python3 $MW_MAIN_DIR/MWTracker_GUI/MWConsole.py; $EXIT_CMD" > $DESKTOLINK
+
 	chmod 744 $DESKTOLINK
 } 
 
@@ -293,7 +302,6 @@ function exec_all {
 
 	compile_cython
 	setup_modules
-	download_examples
 	link_desktop
 }
 
@@ -319,6 +327,9 @@ case $1 in
 	;;
 	"--opencv")
 	opencv_anaconda
+	;;
+	"--tests")
+	download_examples
 	;;
 	*)
 	echo "Exiting... Unrecognized argument: $1"
