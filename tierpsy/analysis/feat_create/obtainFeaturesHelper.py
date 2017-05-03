@@ -15,8 +15,7 @@ from collections import OrderedDict
 from scipy.signal import savgol_filter
 
 from tierpsy.analysis.stage_aligment.alignStageMotion import isGoodStageAligment
-from tierpsy.analysis.contour_orient.correctVentralDorsal import read_ventral_side
-from tierpsy.analysis.params import read_fps, read_microns_per_pixel
+from tierpsy.helper.params import read_fps, read_microns_per_pixel, read_ventral_side
 from tierpsy import AUX_FILES_DIR
 import open_worm_analysis_toolbox as mv
 
@@ -48,6 +47,38 @@ def _h_smooth_curve_all(curves, window=5, pol_degree=3):
                 curves[ii], window=window, pol_degree=pol_degree)
     return curves
 
+
+def _h_get_stage_inv(skeletons_file, timestamp):
+    first_frame = timestamp[0]
+    last_frame = timestamp[-1]
+
+    with tables.File(skeletons_file, 'r') as fid:
+        stage_vec_ori = fid.get_node('/stage_movement/stage_vec')[:]
+        timestamp_ind = fid.get_node('/timestamp/raw')[:].astype(np.int)
+        rotation_matrix = fid.get_node('/stage_movement')._v_attrs['rotation_matrix']
+        microns_per_pixel_scale = fid.get_node('/stage_movement')._v_attrs['microns_per_pixel_scale']
+        #2D to control for the scale vector directions
+            
+    # let's rotate the stage movement
+    dd = np.sign(microns_per_pixel_scale)
+    rotation_matrix_inv = np.dot(
+        rotation_matrix * [(1, -1), (-1, 1)], [(dd[0], 0), (0, dd[1])])
+
+    # adjust the stage_vec to match the timestamps in the skeletons
+    good = (timestamp_ind >= first_frame) & (timestamp_ind <= last_frame)
+
+    ind_ff = timestamp_ind[good] - first_frame
+    stage_vec_ori = stage_vec_ori[good]
+
+    stage_vec = np.full((timestamp.size, 2), np.nan)
+    stage_vec[ind_ff, :] = stage_vec_ori
+    # the negative symbole is to add the stage vector directly, instead of
+    # substracting it.
+    stage_vec_inv = -np.dot(rotation_matrix_inv, stage_vec.T).T
+
+
+    return stage_vec_inv
+
 class WormFromTable():
     def __init__(self, 
                 file_name, 
@@ -57,8 +88,9 @@ class WormFromTable():
                 smooth_window=-1, 
                 POL_DEGREE_DFLT=3):
         # Populates an empty normalized worm.
-        self.microns_per_pixel = read_microns_per_pixel(file_name)
-        self.fps, self.is_default_timestamp = read_fps(file_name)
+        #if it does not exists return 1 as a default, like that we can still calculate the features in pixels and frames, instead of micrometers and seconds.
+        self.microns_per_pixel = read_microns_per_pixel(file_name, dflt=1)
+        self.fps = read_fps(file_name, dflt=1)
         
         # savitzky-golay filter polynomial order default
         self.POL_DEGREE_DFLT = POL_DEGREE_DFLT
@@ -110,7 +142,6 @@ class WormFromTable():
                 # number use the frame nuber instead
                 timestamp_raw = trajectories_data['timestamp_raw'].values
                 if np.any(np.isnan(timestamp_raw)) or np.any(np.diff(timestamp_raw) == 0):
-                    print(timestamp_raw)
                     raise ValueError
                 else:
                     timestamp_inds = timestamp_raw.astype(np.int)
@@ -273,31 +304,8 @@ class WormFromTable():
         self.ventral_side = read_ventral_side(self.file_name)
         
         assert isGoodStageAligment(self.file_name)
-        with tables.File(self.file_name, 'r') as fid:
-            stage_vec_ori = fid.get_node('/stage_movement/stage_vec')[:]
-            timestamp_ind = fid.get_node('/timestamp/raw')[:].astype(np.int)
-            rotation_matrix = fid.get_node('/stage_movement')._v_attrs['rotation_matrix']
-            microns_per_pixel_scale = fid.get_node('/stage_movement')._v_attrs['microns_per_pixel_scale']
-            #2D to control for the scale vector directions
-            
-        # let's rotate the stage movement
-        dd = np.sign(microns_per_pixel_scale)
-        rotation_matrix_inv = np.dot(
-            rotation_matrix * [(1, -1), (-1, 1)], [(dd[0], 0), (0, dd[1])])
-
-        # adjust the stage_vec to match the timestamps in the skeletons
-        timestamp_ind = timestamp_ind
-        good = (timestamp_ind >= self.first_frame) & (timestamp_ind <= self.last_frame)
-
-        ind_ff = timestamp_ind[good] - self.first_frame
-        stage_vec_ori = stage_vec_ori[good]
-
-        stage_vec = np.full((self.timestamp.size, 2), np.nan)
-        stage_vec[ind_ff, :] = stage_vec_ori
-        # the negative symbole is to add the stage vector directly, instead of
-        # substracting it.
-        self.stage_vec_inv = -np.dot(rotation_matrix_inv, stage_vec.T).T
-
+        self.stage_vec_inv = _h_get_stage_inv(self.file_name, self.timestamp)
+        
         for field in ['skeleton', 'ventral_contour', 'dorsal_contour']:
             if hasattr(self, field):
                 tmp_dat = getattr(self, field)
@@ -340,7 +348,7 @@ class WormStats():
 
             motion_types = ['']
             if feat_info['is_time_series']:
-                motion_types += ['_foward', '_paused', '_backward']
+                motion_types += ['_forward', '_paused', '_backward']
 
             for mtype in motion_types:
                 sub_name = feat_name + mtype
@@ -359,24 +367,36 @@ class WormStats():
 
     def getWormStats(self, worm_features, stat_func=np.mean):
         ''' Calculate the statistics of an object worm features, subdividing data
-            into Backward/Foward/Paused and/or Positive/Negative/Absolute, when appropiated.
+            into Backward/Forward/Paused and/or Positive/Negative/Absolute, when appropiated.
             The default is to calculate the mean value, but this can be changed
             using stat_func.
 
             Return the feature list as an ordered dictionary.
         '''
+        
+        if isinstance(worm_features, dict):
+            def read_feat(feat_name):
+                if feat_name in worm_features:
+                    return worm_features[feat_name]
+                else:
+                    return None
+            motion_mode = read_feat('motion_modes')
+        else:
+            
+            def read_feat(feat_name):
+                feat_obj = self.features_info.loc[feat_name, 'feat_name_obj']
+                if feat_obj in  worm_features._features:
+                    return worm_features._features[feat_obj].value
+                else:
+                    return None
+            motion_mode = worm_features._features['locomotion.motion_mode'].value
+
+
         # return data as a numpy recarray
         feat_stats = np.full(1, np.nan, dtype=self.feat_avg_dtype)
-
-        motion_mode = worm_features._features['locomotion.motion_mode'].value
+        
         for feat_name, feat_props in self.features_info.iterrows():
-            feat_obj = feat_props['feat_name_obj']
-
-            if feat_obj in worm_features._features:
-                tmp_data = worm_features._features[feat_obj].value
-            else:
-                tmp_data = None
-
+            tmp_data = read_feat(feat_name)
             if tmp_data is None:
                 feat_stats[feat_name] = np.nan
 
@@ -416,12 +436,12 @@ class WormStats():
         motion_types = OrderedDict()
         motion_types['all'] = np.nan
         if is_time_series:
-            # if the the feature is motion type we can subdivide in Foward,
+            # if the the feature is motion type we can subdivide in Forward,
             # Paused or Backward motion
             motion_mode = motion_mode[valid]
             assert motion_mode.size == data.size
             
-            motion_types['foward'] = motion_mode == 1
+            motion_types['forward'] = motion_mode == 1
             motion_types['paused'] = motion_mode == 0
             motion_types['backward'] = motion_mode == -1
 

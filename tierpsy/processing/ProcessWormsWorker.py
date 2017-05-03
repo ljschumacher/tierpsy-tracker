@@ -9,7 +9,7 @@ import datetime
 import os
 import time
 
-from tierpsy.helper import print_flush
+from tierpsy.helper.misc import print_flush
 from tierpsy.processing.AnalysisPoints import AnalysisPoints
 from tierpsy.processing.batchProcHelperFunc import getRealPathName
 from tierpsy.processing.trackProvenance import getGitCommitHash, execThisPoint
@@ -41,12 +41,16 @@ class ProcessWormsWorker(object):
         print_flush('%s Starting checkpoint: %s' % (base_name, self.analysis_checkpoints[0]))
         initial_time = time.time()
         for current_point in self.analysis_checkpoints:
+            print(current_point)
             unmet_requirements = self.ap.hasRequirements(current_point)
+
             if len(unmet_requirements) != 0:
+                print(unmet_requirements)
                 break
             
             this_point_exists = self.ap.checker.get(current_point)
             if this_point_exists:
+                print('this_point_exists', current_point)
                 break
             
             execThisPoint(current_point, 

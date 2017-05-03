@@ -14,12 +14,13 @@ from scipy.ndimage.filters import median_filter
 from tierpsy.analysis.compress.BackgroundSubtractor import BackgroundSubtractor
 from tierpsy.analysis.compress.extractMetaData import store_meta_data, read_and_save_timestamp
 from tierpsy.analysis.compress.selectVideoReader import selectVideoReader
-from tierpsy.analysis.params import compress_defaults
-from tierpsy.helper import TimeCounter, print_flush
+from tierpsy.helper.params import compress_defaults, set_unit_conversions
+from tierpsy.helper.misc import TimeCounter, print_flush
 
 IMG_FILTERS = {"compression":"gzip",
         "compression_opts":4,
         "shuffle":True,
+
         "fletcher32":True}
 
 def getROIMask(
@@ -163,25 +164,34 @@ def createImgGroup(fid, name, tot_frames, im_height, im_width):
     return img_dataset
 
 def initMasksGroups(fid, expected_frames, im_height, im_width, 
-    expected_fps, is_light_background, save_full_interval):
+    attr_params, save_full_interval):
+
+    
 
     # open node to store the compressed (masked) data
     mask_dataset = createImgGroup(fid, "/mask", expected_frames, im_height, im_width)
-    mask_dataset.attrs['has_finished'] = 0 # flag to indicate if the conversion finished succesfully
-    mask_dataset.attrs['expected_fps'] = expected_fps # setting the expected_fps attribute so it can be read later
-    mask_dataset.attrs['is_light_background'] = int(is_light_background)
     
 
     tot_save_full = (expected_frames // save_full_interval) + 1
     full_dataset = createImgGroup(fid, "/full_data", tot_save_full, im_height, im_width)
     full_dataset.attrs['save_interval'] = save_full_interval
-    full_dataset.attrs['expected_fps'] = expected_fps
-        
+    
 
-    return mask_dataset, full_dataset
+    assert all(x in ['expected_fps', 'is_light_background', 'microns_per_pixel'] for x in attr_params)
+    set_unit_conversions(mask_dataset, **attr_params)
+    set_unit_conversions(full_dataset, **attr_params)
 
-def compressVideo(video_file, masked_image_file, mask_param, bgnd_param ={}, buffer_size=-1,
-                  save_full_interval=-1, max_frame=1e32, expected_fps=25, is_extract_metadata=False):
+    mean_intensity = fid.create_dataset('/mean_intensity',
+                                            (expected_frames,),
+                                            dtype="float32",
+                                            maxshape=(None,),
+                                            **IMG_FILTERS)
+    
+    return mask_dataset, full_dataset, mean_intensity
+
+def compressVideo(video_file, masked_image_file, mask_param,  expected_fps=25,
+                  microns_per_pixel=None, bgnd_param ={}, buffer_size=-1,
+                  save_full_interval=-1, max_frame=1e32, is_extract_metadata=False):
     '''
     Compresses video by selecting pixels that are likely to have worms on it and making the rest of
     the image zero. By creating a large amount of redundant data, any lossless compression
@@ -247,9 +257,14 @@ def compressVideo(video_file, masked_image_file, mask_param, bgnd_param ={}, buf
     with h5py.File(masked_image_file, "r+") as mask_fid:
 
         #initialize masks groups
-        mask_dataset, full_dataset = initMasksGroups(mask_fid, 
-            expected_frames, vid.height, vid.width, expected_fps, 
-            mask_param['is_light_background'], save_full_interval)
+        attr_params = dict(
+            expected_fps = expected_fps,
+            microns_per_pixel = microns_per_pixel,
+            is_light_background = int(mask_param['is_light_background'])
+            )
+        mask_dataset, full_dataset, mean_intensity = initMasksGroups(mask_fid, 
+            expected_frames, vid.height, vid.width,
+            attr_params, save_full_interval)
         
         if vid.dtype != np.uint8:
             # this will worm as flags to be sure that the normalization took place.
@@ -291,10 +306,11 @@ def compressVideo(video_file, masked_image_file, mask_param, bgnd_param ={}, buf
                 # does not impact much the performance)
                 if mask_dataset.shape[0] <= frame_number + 1:
                     mask_dataset.resize(frame_number + 1000, axis=0)
+                    mean_intensity.resize(frame_number + 1000, axis=0)
 
                 # Add a full frame every save_full_interval
                 if frame_number % save_full_interval == 1:
-                    if full_dataset.shape[0] <= full_frame_number:
+                    if full_dataset.shape[0] <= full_frame_number+1:
                         full_dataset.resize(full_frame_number + 1, axis=0)
                         # just to be sure that the index we are saving in is
                         # what we what we are expecting
@@ -314,6 +330,7 @@ def compressVideo(video_file, masked_image_file, mask_param, bgnd_param ={}, buf
 
                 # add image to the buffer
                 Ibuff[ind_buff, :, :] = image.copy()
+                mean_intensity[frame_number] = np.mean(image)
 
             else:
                 # sometimes the last image is all zeros, control for this case
@@ -357,10 +374,14 @@ def compressVideo(video_file, masked_image_file, mask_param, bgnd_param ={}, buf
             if ret == 0:
                 break
 
+
+
         # once we finished to read the whole video, we need to make sure that
         # the hdf5 array sizes are correct.
         if mask_dataset.shape[0] != frame_number:
             mask_dataset.resize(frame_number, axis=0)
+            mean_intensity.resize(frame_number, axis=0)
+
 
         if full_dataset.shape[0] != full_frame_number:
             full_dataset.resize(full_frame_number, axis=0)

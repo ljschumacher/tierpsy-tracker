@@ -18,9 +18,8 @@ import tables
 
 from tierpsy.analysis.compress.BackgroundSubtractor import BackgroundSubtractor
 from tierpsy.analysis.compress.extractMetaData import read_and_save_timestamp
-from tierpsy.analysis.params import read_fps
-from tierpsy.analysis.params import traj_create_defaults
-from tierpsy.helper import TimeCounter, print_flush, TABLE_FILTERS
+from tierpsy.helper.params import traj_create_defaults, read_unit_conversions
+from tierpsy.helper.misc import TimeCounter, print_flush, TABLE_FILTERS
 
 
 def _thresh_bw(pix_valid):
@@ -316,14 +315,7 @@ def getBlobsData(buff_data, blob_params):
                     
     return blobs_data
 
-    
-def _get_light_flag(masked_image_file):
-    with tables.File(masked_image_file, 'r') as mask_fid:
-        mask_dataset = mask_fid.get_node('/', 'mask')
-        is_light_background = 1 if not 'is_light_background' in mask_dataset._v_attrs \
-                 else int(mask_dataset._v_attrs['is_light_background'])
-    return is_light_background
-    
+
 def getBlobsTable(masked_image_file, 
                   trajectories_file,
                   buffer_size = None,
@@ -345,15 +337,12 @@ def getBlobsTable(masked_image_file,
 
 
     #read properties
-    is_light_background = _get_light_flag(masked_image_file)
-    expected_fps, _ = read_fps(masked_image_file)
-    
+    fps_out, _, is_light_background = read_unit_conversions(masked_image_file)
+    expected_fps = fps_out[0]
+
     #find if it is using background subtraction
     if len(bgnd_param) > 0:
         bgnd_param['is_light_background'] = is_light_background
-
-
-    print(expected_fps)
     buffer_size = traj_create_defaults(expected_fps, buffer_size)
     
 
@@ -449,16 +438,6 @@ def getBlobsTable(masked_image_file,
 
     
 if __name__ == '__main__':
-    #%%
-    #dname = '/Users/ajaver/OneDrive - Imperial College London/Local_Videos/fluorescence/'
-    #masked_image_file = os.path.join(dname, 'test_s.hdf5')
-#    min_area=15/2
-#    buffer_size=9
-#    thresh_block_size=15    
-#    max_allowed_dist = 20
-#    area_ratio_lim = (0.25, 4)
-#    n_proc = 20
-    
     masked_image_file = '/Users/ajaver/OneDrive - Imperial College London/Local_Videos/Avelino_17112015/MaskedVideos/CSTCTest_Ch1_17112015_205616.hdf5'
     min_area=25/2
     buffer_size=25

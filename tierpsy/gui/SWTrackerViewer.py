@@ -9,7 +9,7 @@ from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QPainter, QPen
 from PyQt5.QtWidgets import QApplication
 from tierpsy.gui.SWTrackerViewer_ui import Ui_SWTrackerViewer
-from tierpsy.gui.TrackerViewerAux import TrackerViewerAux_GUI
+from tierpsy.gui.TrackerViewerAux import TrackerViewerAuxGUI
 from tierpsy.analysis.int_ske_orient.correctHeadTailIntensity import createBlocks, _fuseOverlapingGroups
 
 
@@ -29,6 +29,9 @@ class EggWriter():
             fid.write('X')
 
     def export(self):
+        if not os.path.exists(self.fname):
+            return
+
         tab = pd.read_table(self.fname, header=None)
         tab.columns = ['base_name', 'frame_number'] 
         tab_g = tab.groupby('base_name')
@@ -52,7 +55,7 @@ class EggWriter():
            
 
 
-class SWTrackerViewer_GUI(TrackerViewerAux_GUI):
+class SWTrackerViewer_GUI(TrackerViewerAuxGUI):
 
     def __init__(self, ui='', mask_file=''):
         if not ui:
@@ -113,6 +116,9 @@ class SWTrackerViewer_GUI(TrackerViewerAux_GUI):
 
     def drawSkelSingleWorm(self):
         frame_data = self.getFrameData(self.frame_number)
+        if frame_data is None:
+            return
+
         row_data = frame_data.squeeze()
         
         #for this viewer there must be only one particle per frame

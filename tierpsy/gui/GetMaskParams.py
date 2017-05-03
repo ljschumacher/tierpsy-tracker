@@ -13,12 +13,12 @@ QFileDialog, QMessageBox, QCheckBox, QButtonGroup, QLabel
 from tierpsy.gui.AnalysisProgress import WorkerFunQt, AnalysisProgress
 from tierpsy.gui.GetAllParameters import GetAllParameters, save_params_json
 from tierpsy.gui.GetMaskParams_ui import Ui_GetMaskParams
-from tierpsy.gui.HDF5VideoPlayer import lineEditDragDrop, ViewsWithZoom, setChildrenFocusPolicy
+from tierpsy.gui.HDF5VideoPlayer import LineEditDragDrop, ViewsWithZoom, setChildrenFocusPolicy
 
 from tierpsy.analysis.compress.BackgroundSubtractor import BackgroundSubtractor
 from tierpsy.processing.ProcessWormsWorker import ProcessWormsWorker
 from tierpsy.processing.batchProcHelperFunc import getDefaultSequence
-from tierpsy.helper import TrackerParams
+from tierpsy.helper.params import TrackerParams
 
 
 class GetMaskParams_GUI(QMainWindow):
@@ -139,7 +139,7 @@ class GetMaskParams_GUI(QMainWindow):
         ]
         for dd_arg in dd_args:
             # let drag and drop a file into the video file line edit
-            lineEditDragDrop(*dd_arg)
+            LineEditDragDrop(*dd_arg)
 
         # make sure the childrenfocus policy is none in order to be able to use
         # the arrow keys
@@ -645,6 +645,9 @@ class ParamWidgetMapper():
         self.param2widget = param2widget_dict
 
     def set(self, param_name, value):
+        if value is None:
+            return None
+
         widget = self.param2widget[param_name]
         if isinstance(widget, QCheckBox):
             return widget.setChecked(value)
@@ -652,6 +655,7 @@ class ParamWidgetMapper():
             for button in widget.buttons():
                 if button.text().replace(" ", "_").upper() == value:
                     return button.setChecked(True)
+        
         elif isinstance(widget, QLabel):
             return widget.setText(value)
         else:

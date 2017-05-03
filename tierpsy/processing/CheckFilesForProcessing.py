@@ -9,7 +9,7 @@ import multiprocessing as mp
 import os
 from functools import partial
 
-from tierpsy.helper import TimeCounter, print_cmd_list
+from tierpsy.helper.misc import TimeCounter, print_cmd_list
 from tierpsy.processing.AnalysisPoints import AnalysisPoints, init_analysis_point_lock
 from tierpsy.processing.ProcessWormsLocal import BATCH_SCRIPT_LOCAL
 from tierpsy.processing.batchProcHelperFunc import create_script
@@ -173,8 +173,8 @@ class CheckFilesForProcessing(object):
             self.filtered_files[label].append((ap_obj, unfinished_points))
 
         print(BREAK_L)
-        print('''Finished to check files.\nTotal time elapsed {}\n'''.format(progress_timer.get_time_str()))
-        print(BREAK_L+ '\n')
+        print('''Finished to check files.\nTotal time elapsed {}'''.format(progress_timer.get_time_str()))
+        print(BREAK_L + '\n')
 
         cmd_list = self.getCMDlist()
         if print_cmd:
