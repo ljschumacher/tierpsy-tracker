@@ -14,9 +14,8 @@ import os
 from collections import OrderedDict
 from scipy.signal import savgol_filter
 
-from tierpsy.analysis.stage_aligment.alignStageMotion import isGoodStageAligment
-from tierpsy.analysis.contour_orient.correctVentralDorsal import read_ventral_side
-from tierpsy.helper.params import read_fps, read_microns_per_pixel
+from tierpsy.analysis.stage_aligment.alignStageMotion import isGoodStageAligment, _h_get_stage_inv
+from tierpsy.helper.params import read_fps, read_microns_per_pixel, read_ventral_side
 from tierpsy import AUX_FILES_DIR
 import open_worm_analysis_toolbox as mv
 
@@ -48,6 +47,9 @@ def _h_smooth_curve_all(curves, window=5, pol_degree=3):
                 curves[ii], window=window, pol_degree=pol_degree)
     return curves
 
+
+
+
 class WormFromTable():
     def __init__(self, 
                 file_name, 
@@ -57,8 +59,9 @@ class WormFromTable():
                 smooth_window=-1, 
                 POL_DEGREE_DFLT=3):
         # Populates an empty normalized worm.
-        self.microns_per_pixel = read_microns_per_pixel(file_name)
-        self.fps, self.is_default_timestamp = read_fps(file_name)
+        #if it does not exists return 1 as a default, like that we can still calculate the features in pixels and frames, instead of micrometers and seconds.
+        self.microns_per_pixel = read_microns_per_pixel(file_name, dflt=1)
+        self.fps = read_fps(file_name, dflt=1)
         
         # savitzky-golay filter polynomial order default
         self.POL_DEGREE_DFLT = POL_DEGREE_DFLT
@@ -272,31 +275,12 @@ class WormFromTable():
         self.ventral_side = read_ventral_side(self.file_name)
         
         assert isGoodStageAligment(self.file_name)
-        with tables.File(self.file_name, 'r') as fid:
-            stage_vec_ori = fid.get_node('/stage_movement/stage_vec')[:]
-            timestamp_ind = fid.get_node('/timestamp/raw')[:].astype(np.int)
-            rotation_matrix = fid.get_node('/stage_movement')._v_attrs['rotation_matrix']
-            microns_per_pixel_scale = fid.get_node('/stage_movement')._v_attrs['microns_per_pixel_scale']
-            #2D to control for the scale vector directions
-            
-        # let's rotate the stage movement
-        dd = np.sign(microns_per_pixel_scale)
-        rotation_matrix_inv = np.dot(
-            rotation_matrix * [(1, -1), (-1, 1)], [(dd[0], 0), (0, dd[1])])
+        self.stage_vec_inv = _h_get_stage_inv(self.file_name, self.timestamp)
 
-        # adjust the stage_vec to match the timestamps in the skeletons
-        timestamp_ind = timestamp_ind
-        good = (timestamp_ind >= self.first_frame) & (timestamp_ind <= self.last_frame)
-
-        ind_ff = timestamp_ind[good] - self.first_frame
-        stage_vec_ori = stage_vec_ori[good]
-
-        stage_vec = np.full((self.timestamp.size, 2), np.nan)
-        stage_vec[ind_ff, :] = stage_vec_ori
-        # the negative symbole is to add the stage vector directly, instead of
-        # substracting it.
-        self.stage_vec_inv = -np.dot(rotation_matrix_inv, stage_vec.T).T
-
+        #remove data where the stage is moving (the blurred image can induce artifacts)
+        self.is_stage_move = np.isnan(self.stage_vec_inv[:,0])
+        self.widths[self.is_stage_move, :] = np.nan 
+        
         for field in ['skeleton', 'ventral_contour', 'dorsal_contour']:
             if hasattr(self, field):
                 tmp_dat = getattr(self, field)

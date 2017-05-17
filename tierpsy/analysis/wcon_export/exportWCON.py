@@ -16,7 +16,8 @@ import tables
 
 from tierpsy.helper.misc import print_flush
 from tierpsy.analysis.feat_create.obtainFeaturesHelper import WormStats
-from tierpsy.analysis.contour_orient.correctVentralDorsal import read_ventral_side
+from tierpsy.helper.params import read_unit_conversions, read_ventral_side, read_fps
+
 
 def getWCONMetaData(fname, READ_FEATURES=False, provenance_step='FEAT_CREATE'):
     def _order_metadata(metadata_dict):
@@ -101,7 +102,7 @@ def __addOMGFeat(fid, worm_feat_time, worm_id):
     return worm_features
     
 
-def _get_ventral_orientation(features_file):
+def _get_ventral_side(features_file):
     ventral_side = read_ventral_side(features_file)
     if not ventral_side or ventral_side == 'unknown':
         ventral_type = '?'
@@ -116,15 +117,22 @@ def _getData(features_file, READ_FEATURES=False, IS_FOR_WCON=True):
     else:
         lab_prefix = ''
 
+
+
     with pd.HDFStore(features_file, 'r') as fid:
+        if not '/features_timeseries' in fid:
+            return {} #empty file nothing to do here
+
         features_timeseries = fid['/features_timeseries']
         feat_time_group_by_worm = features_timeseries.groupby('worm_index');
         
-    ventral_orientation = _get_ventral_orientation(features_file)
+    ventral_side = _get_ventral_side(features_file)
     
     with tables.File(features_file, 'r') as fid:
+
+
         #fps used to adjust timestamp to real time
-        fps = fid.get_node('/features_timeseries').attrs['fps']
+        fps = read_fps(features_file)
         
         
         #get pointers to some useful data
@@ -152,7 +160,7 @@ def _getData(features_file, READ_FEATURES=False, IS_FOR_WCON=True):
             worm_basic = OrderedDict()
             worm_basic['id'] = str(worm_id)
             worm_basic['head'] = 'L'
-            worm_basic['ventral'] = ventral_orientation
+            worm_basic['ventral'] = ventral_side
             worm_basic['ptail'] = worm_ven_cnt.shape[1]-1 #index starting with 0
             
             worm_basic['t'] = worm_feat_time['timestamp'].values/fps #convert from frames to seconds
@@ -181,29 +189,20 @@ def _getData(features_file, READ_FEATURES=False, IS_FOR_WCON=True):
     return all_worms_feats
 
 def _getUnits(features_file, READ_FEATURES=False):
-    def _pixels_or_microns(micronsPerPixel):
-        #if this number is 1 and it is an integer there was not conversion given and the unit is pixels
-        if isinstance(micronsPerPixel, (float, np.float64)) and micronsPerPixel == 1:
-            unit_str = 'pixels'
-        else:
-            unit_str = 'microns'
-        return unit_str
     
-    with tables.File(features_file, 'r') as fid:
-        micronsPerPixel = fid.get_node('/features_timeseries').attrs['micronsPerPixel']
-        
-        
+    fps_out, microns_per_pixel_out, _  = read_unit_conversions(features_file)
+    xy_units = microns_per_pixel_out[1]
+    time_units = fps_out[2]
+
     units = OrderedDict()
-    units['t'] = 'seconds'
     units["size"] = "mm" #size of the plate
+    units['t'] = time_units #frames or seconds
     
-    
-    unit_l_str = _pixels_or_microns(micronsPerPixel)
     for field in ['x', 'y', 'px', 'py']:
-        units[field] = unit_l_str
+        units[field] = xy_units #(pixels or micrometers)
     
     if READ_FEATURES:
-        #TODO double check the units
+        #TODO how to change microns to pixels when required
         ws = WormStats()
         for field, unit in ws.features_info['units'].iteritems():
             units['@OMG ' + field] = unit

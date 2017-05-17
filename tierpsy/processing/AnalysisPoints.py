@@ -21,21 +21,15 @@ from tierpsy.analysis.ske_filt.getFilteredSkels import getFilteredSkels
 from tierpsy.analysis.ske_orient.checkHeadOrientation import correctHeadTail
 
 from tierpsy.analysis.blob_feats.getBlobsFeats import getBlobsFeats
-
-
 from tierpsy.analysis.stage_aligment.alignStageMotion import alignStageMotion, isGoodStageAligment
-
 from tierpsy.analysis.int_profile.getIntensityProfile import getIntensityProfile
 from tierpsy.analysis.int_ske_orient.correctHeadTailIntensity import correctHeadTailIntensity
-
 from tierpsy.analysis.feat_create.obtainFeatures import getWormFeaturesFilt, hasManualJoin
-
-from tierpsy.analysis.contour_orient.correctVentralDorsal import switchCntSingleWorm, hasExpCntInfo, isGoodVentralOrient
-
+from tierpsy.analysis.contour_orient.correctVentralDorsal import switchCntSingleWorm, is_valid_cnt_info, isGoodVentralOrient
 from tierpsy.analysis.wcon_export.exportWCON import getWCOName, exportWCON
-
 from tierpsy.processing.CheckFinished import CheckFinished
 from tierpsy.helper.params import TrackerParams
+
 
 
 
@@ -189,7 +183,7 @@ class AnalysisPoints(object):
                 'argkws': {**{'masked_image_file': fn['masked_image'], 'skeletons_file': fn['skeletons'],
                               'intensities_file': fn['intensities']}, **param.int_profile_param},
                 'input_files' : [fn['skeletons'],fn['masked_image']],
-                'output_files': [fn['intensities']],
+                'output_files': [fn['intensities'], fn['skeletons']],
                 'requirements' : ['SKE_CREATE'],
             },
             'INT_SKE_ORIENT': {
@@ -249,11 +243,11 @@ class AnalysisPoints(object):
             
             self.checkpoints['CONTOUR_ORIENT'] = {
                 'func': switchCntSingleWorm,
-                'argkws': {'skeletons_file': fn['skeletons']},
+                'argkws': {'skeletons_file': fn['skeletons'], 'ventral_side':param.p_dict['ventral_side']},
                 'input_files' : [fn['skeletons']],
                 'output_files': [fn['skeletons']],
                 'requirements' : ['SKE_CREATE',
-                                  ('has_contour_info', partial(hasExpCntInfo, fn['skeletons']))],
+                                  ('is_valid_cnt_info', partial(is_valid_cnt_info, fn['skeletons'], param.p_dict['ventral_side']))],
             }
             #make sure the file has the additional files, even before start compression
             for key in ['COMPRESS', 'COMPRESS_ADD_DATA']:
