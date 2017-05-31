@@ -2,7 +2,7 @@ import tables
 import h5py
 import numpy as np
 import json
-
+import os
 
 VALID_FIELDS = ['/mask', '/trajectories_data', '/features_timeseries']
 class AttrReader():
@@ -13,36 +13,35 @@ class AttrReader():
 
 
     def _find_field(self):
-        
-        with tables.File(self.file_name, 'r') as fid:
-            for field in VALID_FIELDS:
-                if field in fid:
-                    return field
+        if os.path.exists(self.file_name):
+            with tables.File(self.file_name, 'r') as fid:
+                for field in VALID_FIELDS:
+                    if field in fid:
+                        return field
         #raise KeyError("Not valid field {} found in {}".format(VALID_FIELDS, self.file_name)) 
         return ''
 
     def _read_attr(self, attr_name, dflt=None):
+        
         if dflt is None:
             dflt = self.dflt
 
-        if not self.field:
-            return self.dflt
-        with tables.File(self.file_name, 'r') as fid:
-            node = fid.get_node(self.field)
-
-            if attr_name in node._v_attrs:
-                attr = node._v_attrs[attr_name]
-            else:
-                attr = self.dflt #default in old videos
-            return attr
+        attr = dflt
+        if self.field:
+            with tables.File(self.file_name, 'r') as fid:
+                node = fid.get_node(self.field)
+                
+                if attr_name in node._v_attrs:
+                    attr = node._v_attrs[attr_name] 
+        return attr
 
     def get_fps(self):
         expected_fps = self._read_attr('expected_fps', dflt=1)
         try:
+
             #try to calculate the frames per second from the timestamp
             with tables.File(self.file_name, 'r') as fid:
                 timestamp_time = fid.get_node('/timestamp/time')[:]
-
                 if np.all(np.isnan(timestamp_time)):
                     raise ValueError
                 fps = 1 / np.nanmedian(np.diff(timestamp_time))
@@ -52,10 +51,9 @@ class AttrReader():
 
                 time_units = 'seconds'
 
-        except (tables.exceptions.NoSuchNodeError, IOError, ValueError):
-            fps = self._read_attr('fps', dflt=None)
-            
-            if fps is None:
+        except:# (tables.exceptions.NoSuchNodeError, IOError, ValueError):
+            fps = self._read_attr('fps', dflt=-1)
+            if fps < 0:
                 #read the user defined timestamp
                 fps = expected_fps
 
@@ -68,8 +66,8 @@ class AttrReader():
             
             
         
-        self._fps = fps
-        self._expected_fps = expected_fps
+        self._fps = float(fps)
+        self._expected_fps = float(expected_fps)
         self._time_units = time_units
 
         return self._fps, self._expected_fps, self._time_units
@@ -114,7 +112,7 @@ class AttrReader():
  
 
             
-        self._microns_per_pixel = microns_per_pixel
+        self._microns_per_pixel = float(microns_per_pixel)
         self._xy_units = xy_units
         return self._microns_per_pixel, self._xy_units
 
@@ -153,6 +151,7 @@ def read_ventral_side(fname):
     return reader.get_ventral_side()
     
 def read_fps(fname, dflt=1):
+    assert isinstance(fname, str)
     reader = AttrReader(fname, dflt)
     return reader.fps
 
@@ -201,7 +200,7 @@ def set_unit_conversions(group_to_save, expected_fps=None, microns_per_pixel=Non
 
 
     # save some data used in the calculation as attributes
-    if microns_per_pixel is None:
+    if microns_per_pixel is None or microns_per_pixel<=0:
         attr_writer['microns_per_pixel'] = 1
         attr_writer['xy_units'] = 'pixels'
     else: 
@@ -209,7 +208,7 @@ def set_unit_conversions(group_to_save, expected_fps=None, microns_per_pixel=Non
         attr_writer['xy_units'] = 'micrometers'
 
     # save some data used in the calculation as attributes
-    if expected_fps is None:
+    if expected_fps is None or expected_fps<=0:
         attr_writer['expected_fps'] = 1
         attr_writer['time_units'] = 'frames'
     else: 

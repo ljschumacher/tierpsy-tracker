@@ -3,10 +3,12 @@ import sys
 import os
 import tables
 import warnings
-from tierpsy import AUX_FILES_DIR
+
 
 from threading import Thread
 from queue import Queue, Empty
+
+from tierpsy import AUX_FILES_DIR
 
 # get the correct path for ffmpeg. First we look in the aux
 # directory, otherwise we look in the system path.
@@ -18,7 +20,6 @@ def get_local_or_sys_path(file_name):
     if not file_source:
         raise FileNotFoundError('command not found: %s' % file_name)
     return file_source
-
 
 try:
     if sys.platform == 'win32':
@@ -79,3 +80,6 @@ class ReadEnqueue():
         except Empty:
             line  = None
         return line
+
+
+
