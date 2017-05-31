@@ -147,7 +147,7 @@ function redhat_dependencies {
 function anaconda_pkgs {
 	echo "Installing get_anaconda extra packages..."
 	#conda install -y python=3.5.3 pip
-	conda install -y numpy matplotlib pytables pandas gitpython pyqt \
+	conda install -y numpy matplotlib pytables pandas gitpython pyqt=5 \
 	h5py scipy scikit-learn scikit-image seaborn xlrd cython statsmodels
 	conda install -y -c conda-forge tensorflow keras
 
@@ -226,7 +226,6 @@ function get_anaconda {
     else
         _anaconda
     fi
-
     anaconda_pkgs
     opencv_anaconda
 }
@@ -275,7 +274,7 @@ function link_desktop {
 		EXIT_CMD="exit"
 	fi
 
-	echo "python3 $MW_MAIN_DIR/MWTracker_GUI/MWConsole.py; $EXIT_CMD" > $DESKTOLINK
+	echo "python3 $MW_MAIN_DIR/cmd_scripts/TierpsyTrackerConsole.py; $EXIT_CMD" > $DESKTOLINK
 
 	chmod 744 $DESKTOLINK
 } 
@@ -307,7 +306,7 @@ function exec_all {
 
 case $1 in
 	""|"--all")
-	"exec_all"
+	exec_all
 	;;
 	"--compile_cython")
 	compile_cython

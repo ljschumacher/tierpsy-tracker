@@ -16,13 +16,13 @@ import tables
 
 from tierpsy.helper.misc import print_flush
 from tierpsy.analysis.feat_create.obtainFeaturesHelper import WormStats
-from tierpsy.helper.params import read_unit_conversions, read_ventral_side
+from tierpsy.helper.params import read_unit_conversions, read_ventral_side, read_fps
 
 
 def getWCONMetaData(fname, READ_FEATURES=False, provenance_step='FEAT_CREATE'):
     def _order_metadata(metadata_dict):
         ordered_fields = ['strain', 'timestamp', 'gene', 'chromosome', 'allele', 
-        'genotype', 'sex', 'stage', 'ventral_side', 'media', 'arena', 'food', 
+        'strain_description', 'sex', 'stage', 'ventral_side', 'media', 'arena', 'food', 
         'habituation', 'who', 'protocol', 'lab', 'software']
         
         extra_fields = metadata_dict.keys() - set(ordered_fields)
@@ -117,15 +117,22 @@ def _getData(features_file, READ_FEATURES=False, IS_FOR_WCON=True):
     else:
         lab_prefix = ''
 
+
+
     with pd.HDFStore(features_file, 'r') as fid:
+        if not '/features_timeseries' in fid:
+            return {} #empty file nothing to do here
+
         features_timeseries = fid['/features_timeseries']
         feat_time_group_by_worm = features_timeseries.groupby('worm_index');
         
     ventral_side = _get_ventral_side(features_file)
     
     with tables.File(features_file, 'r') as fid:
+
+
         #fps used to adjust timestamp to real time
-        fps = fid.get_node('/features_timeseries').attrs['fps']
+        fps = read_fps(features_file)
         
         
         #get pointers to some useful data

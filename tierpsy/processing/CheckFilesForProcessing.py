@@ -11,10 +11,10 @@ from functools import partial
 
 from tierpsy.helper.misc import TimeCounter, print_cmd_list
 from tierpsy.processing.AnalysisPoints import AnalysisPoints, init_analysis_point_lock
-from tierpsy.processing.ProcessWormsLocal import BATCH_SCRIPT_LOCAL
-from tierpsy.processing.batchProcHelperFunc import create_script
+from tierpsy.processing.ProcessLocal import BATCH_SCRIPT_LOCAL
+from tierpsy.processing.helper import create_script
 
-BREAK_L = '*********************************************' #use the list as below, otherwise it does weird copies of the list
+BREAK_L = '*********************************************'
 
 
 class CheckFilesForProcessing(object):
@@ -23,7 +23,7 @@ class CheckFilesForProcessing(object):
                  json_file='', analysis_checkpoints = [],
                   is_copy_video = True, 
                   copy_unfinished=True,
-                  is_parallel_check=False):
+                  is_parallel_check=True):
         
         def _testFileExists(fname, type_str):
             if fname:
@@ -87,6 +87,11 @@ class CheckFilesForProcessing(object):
     def _getSubDirPath(self, source_dir, source_root_dir):
         '''Generate the destination dir path keeping the same structure 
         as the source directory'''
+
+        #if the source_root_dir is empty do not create a subdir_path
+        if not source_root_dir:
+            return ''
+
         subdir_path = source_dir.replace(source_root_dir, '')
 
         #TODO: What happends is there is MaskedVideos within the subdirectory 

@@ -138,7 +138,6 @@ def reduceBuffer(Ibuff, is_light_background):
         return np.max(Ibuff, axis=0)
 
 def createImgGroup(fid, name, tot_frames, im_height, im_width):
-    
     img_dataset = fid.create_dataset(
         name,
         (tot_frames,
@@ -189,9 +188,11 @@ def initMasksGroups(fid, expected_frames, im_height, im_width,
     
     return mask_dataset, full_dataset, mean_intensity
 
+
+
 def compressVideo(video_file, masked_image_file, mask_param,  expected_fps=25,
                   microns_per_pixel=None, bgnd_param ={}, buffer_size=-1,
-                  save_full_interval=-1, max_frame=1e32, is_extract_metadata=False):
+                  save_full_interval=-1, max_frame=1e32, is_extract_timestamp=False):
     '''
     Compresses video by selecting pixels that are likely to have worms on it and making the rest of
     the image zero. By creating a large amount of redundant data, any lossless compression
@@ -208,9 +209,12 @@ def compressVideo(video_file, masked_image_file, mask_param,  expected_fps=25,
      mask_param -- parameters used to calculate the mask
     '''
 
-    output = compress_defaults(expected_fps, 
-                    buffer_size = buffer_size, 
-                    save_full_interval = save_full_interval)
+    #get the default values if there is any bad parameter
+    output = compress_defaults(masked_image_file, 
+                                expected_fps, 
+                                buffer_size = buffer_size, 
+                                save_full_interval = save_full_interval)
+
     buffer_size = output['buffer_size'] 
     save_full_interval = output['save_full_interval'] 
 
@@ -219,27 +223,29 @@ def compressVideo(video_file, masked_image_file, mask_param,  expected_fps=25,
         assert bgnd_param['buff_size']>0 and bgnd_param['frame_gap']>0
     else:
         is_bgnd_subtraction = False
-    
+
     # processes identifier.
     base_name = masked_image_file.rpartition('.')[0].rpartition(os.sep)[-1]
-
+    
+    # select the video reader class according to the file type.
+    vid = selectVideoReader(video_file)
+    
     # delete any previous  if it existed
     with h5py.File(masked_image_file, "w") as mask_fid:
         pass
-
-    # select the video reader class according to the file type.
-    vid = selectVideoReader(video_file)
-
-    if vid.width == 0 or vid.height == 0:
-        raise RuntimeError
-
-    if is_extract_metadata:
+    
+    #Extract metadata
+    if is_extract_timestamp:
         # extract and store video metadata using ffprobe
+        #NOTE: i cannot calculate /timestamp until i am sure of the total number of frames
         print_flush(base_name + ' Extracting video metadata...')
         expected_frames = store_meta_data(video_file, masked_image_file)
+
     else:
         expected_frames = 1
     
+    # Initialize background subtraction if required
+
     if is_bgnd_subtraction:
         print_flush(base_name + ' Initializing background subtraction.')
         bgnd_subtractor = BackgroundSubtractor(video_file, **bgnd_param)
@@ -252,7 +258,14 @@ def compressVideo(video_file, masked_image_file, mask_param,  expected_fps=25,
 
     # initialize timers
     print_flush(base_name + ' Starting video compression.')
-    progressTime = TimeCounter('Compressing video.')
+
+
+    if expected_frames == 1:
+        progressTime = TimeCounter('Compressing video.')
+    else:
+        #if we know the number of frames display it in the progress
+        progressTime = TimeCounter('Compressing video.', expected_frames)
+
 
     with h5py.File(masked_image_file, "r+") as mask_fid:
 

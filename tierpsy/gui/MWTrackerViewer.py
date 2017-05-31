@@ -5,20 +5,21 @@ from functools import partial
 import numpy as np
 import pandas as pd
 import tables
-from PyQt5.QtCore import Qt, QPointF
-from PyQt5.QtGui import QPixmap, QPainter, QFont, QPen, QPolygonF, QColor
-from PyQt5.QtWidgets import QApplication, QMessageBox
+from PyQt5.QtCore import Qt, QPointF, pyqtSignal
+from PyQt5.QtGui import QPixmap, QPainter, QFont, QPen, QPolygonF, QColor, QKeySequence
+from PyQt5.QtWidgets import QApplication, QMessageBox, QShortcut
 
 from tierpsy.analysis.feat_create.obtainFeatures import getWormFeaturesFilt
 from tierpsy.analysis.ske_create.helperIterROI import getWormROI
 from tierpsy.analysis.ske_filt.getFilteredSkels import getValidIndexes
+from tierpsy.analysis.ske_filt import _get_feat_filt_param
 
 from tierpsy.gui.AnalysisProgress import WorkerFunQt, AnalysisProgress
 from tierpsy.gui.MWTrackerViewer_ui import Ui_MWTrackerViewer
 from tierpsy.gui.TrackerViewerAux import TrackerViewerAuxGUI
 
 from tierpsy.helper.misc import WLAB, save_modified_table
-from tierpsy.helper.params import TrackerParams
+from tierpsy.helper.params import TrackerParams, read_fps
 
 from tierpsy.processing.trackProvenance import getGitCommitHash, execThisPoint
 
@@ -30,6 +31,9 @@ class MWTrackerViewer_GUI(TrackerViewerAuxGUI):
             super().__init__(Ui_MWTrackerViewer())
         else:
             super().__init__(ui)
+
+        self.setWindowTitle("Multi-Worm Viewer")
+
 
         self.vfilename = '' if len(argv) <= 1 else argv[1]
         self.lastKey = ''
@@ -51,6 +55,8 @@ class MWTrackerViewer_GUI(TrackerViewerAuxGUI):
         self.skeletons_file = ''
         self.worm_index_type = 'worm_index_manual'
         self.label_type = 'worm_label'
+        self.frame_data = None
+
 
         self.ui.comboBox_ROI1.activated.connect(self.selectROI1)
         self.ui.comboBox_ROI2.activated.connect(self.selectROI2)
@@ -67,13 +73,13 @@ class MWTrackerViewer_GUI(TrackerViewerAuxGUI):
         # flags for RW and FF
         self.RW, self.FF = 1, 2
         self.ui.pushButton_ROI1_RW.clicked.connect(
-            partial(self.roiRWFF, 1, self.RW))
+            partial(self.roiRWFF, self.RW, 1))
         self.ui.pushButton_ROI1_FF.clicked.connect(
-            partial(self.roiRWFF, 1, self.FF))
+            partial(self.roiRWFF, self.FF, 1))
         self.ui.pushButton_ROI2_RW.clicked.connect(
-            partial(self.roiRWFF, 2, self.RW))
+            partial(self.roiRWFF, self.RW, 2))
         self.ui.pushButton_ROI2_FF.clicked.connect(
-            partial(self.roiRWFF, 2, self.FF))
+            partial(self.roiRWFF, self.FF, 2))
 
         self.ui.pushButton_U.clicked.connect(
             partial(self.tagWorm, self.wlab['U']))
@@ -100,6 +106,32 @@ class MWTrackerViewer_GUI(TrackerViewerAuxGUI):
 
         # select worm ROI when doubleclick a worm
         self.mainImage._canvas.mouseDoubleClickEvent = self.selectWorm
+
+        #SHORTCUTS
+        self.ui.pushButton_W.setShortcut(QKeySequence(Qt.Key_W))
+        self.ui.pushButton_U.setShortcut(QKeySequence(Qt.Key_U))
+        self.ui.pushButton_WS.setShortcut(QKeySequence(Qt.Key_C))
+        self.ui.pushButton_B.setShortcut(QKeySequence(Qt.Key_B))
+        self.ui.radioButton_ROI1.setShortcut(QKeySequence(Qt.Key_Up))
+        self.ui.radioButton_ROI2.setShortcut(QKeySequence(Qt.Key_Down))
+        self.ui.pushButton_join.setShortcut(QKeySequence(Qt.Key_J))
+        self.ui.pushButton_split.setShortcut(QKeySequence(Qt.Key_S))
+
+    
+
+    def keyPressEvent(self, event):
+        #MORE SHORTCUTS
+        # go the the start of end of a trajectory
+        if event.key() == Qt.Key_BracketLeft:
+            current_roi = 1 if self.ui.radioButton_ROI1.isChecked() else 2
+            self.roiRWFF(current_roi, self.RW)
+        #[ <<
+        elif event.key() == Qt.Key_BracketRight:
+            current_roi = 1 if self.ui.radioButton_ROI1.isChecked() else 2
+            self.roiRWFF(current_roi, self.FF)
+
+        super().keyPressEvent(event)
+
 
     def getManualFeatures(self):
         # save the user changes before recalculating anything
@@ -208,15 +240,10 @@ class MWTrackerViewer_GUI(TrackerViewerAuxGUI):
                 'bad_seg_thresh',
                 'min_displacement']}
             except (KeyError, tables.exceptions.NoSuchNodeError):
-                self.feat_filt_param = self.param_default.feat_filt_param
+                self.feat_filt_param = _get_feat_filt_param(self.param_default.p_dict)
 
-        try:
-            #read expected frames per second
-            with tables.File(self.vfilename, 'r') as mask_fid:
-                self.expected_fps = int(mask_fid.get_node('/mask')._v_attrs['expected_fps'])  
-        except (OSError, tables.exceptions.NoSuchNodeError, AttributeError, KeyError):
-            self.expected_fps = self.param_default.expected_fps
-
+        self.expected_fps = read_fps(self.vfilename)
+        
 
         #TODO: THIS IS NOT REALLY THE INDEX I USE IN THE FEATURES FILES. I NEED A MORE CLEVER WAY TO SEE WHAT I AM REALLY FILTERING.
         dd = {x:self.feat_filt_param[x] for x in ['min_num_skel', 'bad_seg_thresh', 'min_displacement']}
@@ -357,6 +384,7 @@ class MWTrackerViewer_GUI(TrackerViewerAuxGUI):
         self.updateROIcanvasN(2)
 
     def updateROIcanvasN(self, n_canvas):
+
         if n_canvas == 1:
             self.updateROIcanvas(
                 self.ui.wormCanvas1,
@@ -370,6 +398,10 @@ class MWTrackerViewer_GUI(TrackerViewerAuxGUI):
                 self.ui.comboBox_ROI2,
                 self.ui.checkBox_ROI2.isChecked())
 
+        
+
+                
+
     # function that generalized the updating of the ROI
     def updateROIcanvas(
             self,
@@ -377,6 +409,7 @@ class MWTrackerViewer_GUI(TrackerViewerAuxGUI):
             worm_index_roi,
             comboBox_ROI,
             isDrawSkel):
+
         if self.frame_data is None:
             # no trajectories data presented, nothing to do here
             wormCanvas.clear()
@@ -469,15 +502,18 @@ class MWTrackerViewer_GUI(TrackerViewerAuxGUI):
         self.updateImage()
 
     # move to the first or the last frames of a trajectory
-    def roiRWFF(self, n_roi, rwff):
+    def roiRWFF(self, rwff, n_roi=None):
 
         if self.frame_data is None:
             return
-
+        if n_roi is None:
+            n_roi = 1 if self.ui.radioButton_ROI1.isChecked() else 2
         if n_roi == 1:
             worm_ind = self.worm_index_roi1
-        else:
+        elif n_roi == 2:
             worm_ind = self.worm_index_roi2
+        else:
+            raise ValueError('Invalid n_roi value : {} '.format(n_roi))
 
         # use 1 for rewind RW or 2 of fast forward
         good = self.trajectories_data[self.worm_index_type] == worm_ind
@@ -486,15 +522,18 @@ class MWTrackerViewer_GUI(TrackerViewerAuxGUI):
         if frames.size == 0:
             return
 
-        if rwff == 1:
+        if rwff == self.RW:
             self.frame_number = frames.min()
-        elif rwff == 2:
+        elif rwff == self.FF:
             self.frame_number = frames.max()
+        else:
+            raise ValueError('Invalid rwff value : {} '.format(rwff))
 
         self.ui.spinBox_frame.setValue(self.frame_number)
 
     def joinTraj(self):
-        if not self.worm_index_type == 'worm_index_manual':
+        if self.worm_index_type != 'worm_index_manual' \
+        or self.frame_data is None:
             return
 
         worm_ind1 = self.worm_index_roi1
@@ -555,7 +594,8 @@ class MWTrackerViewer_GUI(TrackerViewerAuxGUI):
         self.ui.spinBox_join2.setValue(worm_ind1)
 
     def splitTraj(self):
-        if not self.worm_index_type == 'worm_index_manual':
+        if self.worm_index_type != 'worm_index_manual' \
+        or self.frame_data is None:
             return
 
         if self.ui.radioButton_ROI1.isChecked():
@@ -593,43 +633,7 @@ class MWTrackerViewer_GUI(TrackerViewerAuxGUI):
         self.ui.spinBox_join1.setValue(new_ind1)
         self.ui.spinBox_join2.setValue(new_ind2)
 
-    # change frame number using the keys
-    def keyPressEvent(self, event):
-        # select uchange the radio button pression the up and down keys
-        if event.key() == Qt.Key_Up:
-            self.ui.radioButton_ROI1.setChecked(True)
-        elif event.key() == Qt.Key_Down:
-            self.ui.radioButton_ROI2.setChecked(True)
-
-        # undefined: u
-        if event.key() == Qt.Key_U:
-            self.tagWorm(self.wlab['U'])
-        # worm: w
-        elif event.key() == Qt.Key_W:
-            self.tagWorm(self.wlab['WORM'])
-        # worm cluster: c
-        elif event.key() == Qt.Key_C:
-            self.tagWorm(self.wlab['WORMS'])
-        # bad: b
-        elif event.key() == Qt.Key_B:
-            self.tagWorm(self.wlab['BAD'])
-        # s
-        elif event.key() == Qt.Key_J:
-            self.joinTraj()
-        # j
-        elif event.key() == Qt.Key_S:
-            self.splitTraj()
-
-        # go the the start of end of a trajectory
-        elif event.key() == Qt.Key_BracketLeft:
-            current_roi = 1 if self.ui.radioButton_ROI1.isChecked() else 2
-            self.roiRWFF(current_roi, self.RW)
-        #[ <<
-        elif event.key() == Qt.Key_BracketRight:
-            current_roi = 1 if self.ui.radioButton_ROI1.isChecked() else 2
-            self.roiRWFF(current_roi, self.FF)
-
-        super().keyPressEvent(event)
+    
 
 if __name__ == '__main__':
     import sys
