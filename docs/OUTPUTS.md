@@ -35,7 +35,7 @@ Timestamp extracted from the video if the `is_extract_metadata` flag set to `tru
 Low time and spatial resolution avi video generated using the data in [/mask](#mask).
 
 ## basename_skeletons.hdf5
-Contains the results of the [tracking](#create-trajectories) and [skeletonization](#calculate-skeletons) steps.
+Contains the results of the [tracking](EXPLANATION.md/#create-trajectories) and [skeletonization](EXPLANATION.md/#calculate-skeletons) steps.
 
 #### /plate_worms
 Table where the first results of [TRAJ_CREATE](EXPLANATION.md/#traj_create) and [TRAJ_JOIN](EXPLANATION.md/#traj_join). Do not use this table in further analysis, use instead [/trajectories_data](#trajectories_data).
@@ -58,8 +58,8 @@ Table containing the data of the trajectories used in the analysis and displayed
   * `coord_x`, `coord_y`: centroid coordinates after smoothing [/plate_worms](#plate_worms). It is used to find the ROI to calculate the skeletons. If you want to calculate the centroid features use the corresponding field in [/blob_features](#blob_features).
   * `threshold`: value used to binarize the ROI.
   * `has_skeleton`: `true` is the skeletonization was succesful.
-  * `is_good_skel`: `true` if the skeleton passed the [filter step](#ske_filt). Only rows with this flag as `true` will be used to calculate the [skeleton features](#feat_create). 
-  * skel_outliers_flag: internal used to identify why a skeleton was rejected in the [filter step](#ske_filt).
+  * `is_good_skel`: `true` if the skeleton passed the [filter step](#ske_filt). Only rows with this flag as `true` will be used to calculate the [skeleton features](EXPLANATION.md/#feat_create). 
+  * skel_outliers_flag: internal used to identify why a skeleton was rejected in the [filter step](EXPLANATION.md/#ske_filt).
   * `roi_size`: size in pixels of the region of interest. Should be constant for a given trajectory.
   * `area`: expected blob area. Useful to filter spurious particles after the ROI binarization.
   * `timestamp_raw`: timestamp number. Useful to find droped frames.
@@ -99,7 +99,7 @@ Area in pixels of the binary image used to calculate the skeletons. Probably sho
 Internal. Table with the skeleton switched in [INT_SKE_ORIENT](EXPLANATION.md/#int_ske_orient).
 
 #### /timestamp/raw /timestamp/time
-Same as in [basename.hdf5](#basename.hdf5).
+Same as in [basename.hdf5](#basenamehdf5).
 
 ## basename_intensities.hdf5
 
@@ -155,7 +155,7 @@ Table containing the features that can be represented as timeseries. Each row co
   * `path_range` : `(micrometers)` distance of the worm’s midbody from the path centroid.
   * `path_curvature` : `(radians/micrometers)` the angle of the worm's path divided by the distance travelled.
 
-#### /features_events/worm_*
+#### /features_events/worm_*
   * `worm_dwelling`, `head_dwelling`, `midbody_dwelling`, `tail_dwelling` : `(seconds)` time duration a body part spends in a specific region of the plate. The worm path is subdivided in uniform grids where each element diagonal is equal to the body part mean width. The stored vector contains the time spend in each grid, excluding the grids that the body part never visited.
 
 Each time frame can be labeled according to any of the following events definitions (modified from the Supplementary Material of [Yemini et al.](http://www.nature.com/nmeth/journal/v10/n9/full/nmeth.2560.html):
