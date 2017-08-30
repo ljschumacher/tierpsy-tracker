@@ -11,7 +11,7 @@ tests/data/*
 *.exe
 *.so
 *.c
-*.py~
+*.*~
 
 tierpsy.egg-info/
 _site/
