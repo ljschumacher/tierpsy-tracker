@@ -327,7 +327,7 @@ def joinGapsTrajectoriesDF(plate_worms,
                 (areaR > area_ratio_lim[0]) & (
                     areaR < area_ratio_lim[1])]
     
-            # not valid rows left
+            # no valid rows left
             if len(possible_rows) == 0:
                 continue
     
@@ -338,7 +338,8 @@ def joinGapsTrajectoriesDF(plate_worms,
     
             indmin = np.argmin(R)
             # only join trajectories that move at most one worm body
-            if R[indmin] <= max_allowed_dist*max_frames_gap:
+            num_frames_gap = first_rows['frame_number'][indmin] - last_rows['frame_number'][curr_index]
+            if R[indmin] <= max_allowed_dist*num_frames_gap:
 #last_rows['box_length'][curr_index]:
                 #print(curr_index, indmin)
                 join_frames.append((indmin, curr_index))
@@ -350,7 +351,7 @@ def joinGapsTrajectoriesDF(plate_worms,
     
     def _joinDict2Index(worm_index, relations_dict, valid_indexes):
         worm_index_new = np.full_like(worm_index, -1)
-    
+        
         for ind in valid_indexes:
             # seach in the dictionary for the first index in the joined trajectory
             # group
@@ -387,6 +388,7 @@ def joinBlobsTrajectories(trajectories_file,
         area_ratio_lim = (1/area_ratio_lim, area_ratio_lim)
 
     assignBlobTraj(trajectories_file, max_allowed_dist, area_ratio_lim)
+
     if analysis_type == 'WT2':
         correctSingleWormCase(trajectories_file)
     else:
