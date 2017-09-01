@@ -219,7 +219,7 @@ def saveTrajData(trajectories_data, masked_image_file, skeletons_file):
                 'trajectories_data',
                 obj=trajectories_data.to_records(index=False),
                 filters=TABLE_FILTERS)
-    except tables.exceptions.NodeError
+    except tables.exceptions.NodeError:
         with tables.File(skeletons_file, "r+") as ske_file_id:
             trajectories_data_f = ske_file_id.create_table(
                 '/',
