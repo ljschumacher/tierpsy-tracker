@@ -339,21 +339,20 @@ def correctHeadTailIntWorm(
     # normalize intensities of each individual profile
     worm_int_profile -= np.median(worm_int_profile, axis=1)[:, np.newaxis]
 
-    # reduce the importance of the head and tail. This parts are typically
-    # more noisy
-    damp_factor = getDampFactor(worm_int_profile.shape[1])
-    worm_int_profile *= damp_factor
     if method == 'HEAD_BRIGHTER':
         segmentIndex = worm_int_profile.shape[1]//5
         top_part = worm_int_profile[:,1:segmentIndex].astype(np.float)
         bot_part = worm_int_profile[:,-segmentIndex:].astype(np.float)
         # get the difference between the max of the first part and the min of the last part of skeleton
-        #diff_ori = np.abs(np.median(top_part, axis=1) - np.min(bot_part, axis=1)) # diff_inv should be high when the orientation is correct
-        #diff_inv = np.abs(np.min(top_part, axis=1) - np.max(bot_part, axis=1)) # diff_ori should be high when the orientation is incorrect
         diff_inv = np.median(top_part, axis=1) - np.median(bot_part, axis=1) #diff_inv should be high when the orientation is correct
         diff_ori = 0
 
     else: # default method is 'MEDIAN_INT'
+        # reduce the importance of the head and tail. This parts are typically
+        # more noisy
+        damp_factor = getDampFactor(worm_int_profile.shape[1])
+        worm_int_profile *= damp_factor
+
         # worm median intensity
         med_int = np.median(worm_int_profile, axis=0).astype(np.float)
 

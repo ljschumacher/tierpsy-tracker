@@ -61,8 +61,8 @@ def _thresh_bodywallmuscle(pix_valid):
     # when fluorescent worms are present, the distribution of pixels should be asymmetric, with a peak at low values corresponding to the background
     if pix_mean > pix_median*1.1: # alternatively, could use scipy.stats.skew and some threshold, like >1/2
         thresh = pix_mean
-    else: # try usual thresholding otherwise
-        thresh = 255 - _thresh_bw(255 - pix_valid) #correct for fluorescence images
+    else: # try fixed thresholding otherwise
+        thresh = 45 #correct for fluorescence images
     return thresh
 
 def getBufferThresh(ROI_buffer, worm_bw_thresh_factor, is_light_background, analysis_type):
