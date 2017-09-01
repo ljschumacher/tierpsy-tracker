@@ -337,9 +337,6 @@ def joinGapsTrajectoriesDF(plate_worms,
                          last_rows['coord_y'][curr_index]) ** 2)
     
             indmin = np.argmin(R)
-            import pdb
-            pdb.set_trace()
-            print(R[indmin])
             # only join trajectories that move at most one worm body
             if R[indmin] <= max_allowed_dist*max_frames_gap:
 #last_rows['box_length'][curr_index]:
