@@ -241,7 +241,8 @@ def correctSingleWormCase(trajectories_file):
 def joinGapsTrajectories(trajectories_file, 
                          min_track_size=50,
                          max_frames_gap=100, 
-                         area_ratio_lim=(0.67, 1.5)):
+                         area_ratio_lim=(0.67, 1.5),
+                         max_allowed_dist=30):
     #% get the first and last rows for each trajectory. Pandas is easier of manipulate than tables.
     with pd.HDFStore(trajectories_file, 'r') as fid:
         df = fid['plate_worms'][['worm_index_blob', 'frame_number',
@@ -250,7 +251,8 @@ def joinGapsTrajectories(trajectories_file,
     worm_index_joined = joinGapsTrajectoriesDF(df, 
                            min_track_size=min_track_size,
                            max_frames_gap=max_frames_gap, 
-                           area_ratio_lim=area_ratio_lim
+                           area_ratio_lim=area_ratio_lim,
+                           max_allowed_dist=max_allowed_dist
                            )
 
     # update worm_index_joined field
@@ -266,6 +268,7 @@ def joinGapsTrajectoriesDF(plate_worms,
                            min_track_size=50,
                            max_frames_gap=100, 
                            area_ratio_lim=(0.67, 1.5),
+                           max_allowed_dist=30,
                            worm_index_type='worm_index_blob'):
     '''
     area_ratio_lim -- allowed range between the area ratio of consecutive frames
@@ -278,7 +281,8 @@ def joinGapsTrajectoriesDF(plate_worms,
     def _findNextTraj(df, 
                       area_ratio_lim, 
                       min_track_size, 
-                      max_frames_gap):
+                      max_frames_gap,
+                      max_allowed_dist):
         '''
         area_ratio_lim -- allowed range between the area ratio of consecutive frames
         min_track_size -- minimum tracksize accepted
@@ -330,11 +334,15 @@ def joinGapsTrajectoriesDF(plate_worms,
             R = np.sqrt((possible_rows['coord_x'] -
                          last_rows['coord_x'][curr_index]) ** 2 +
                         (possible_rows['coord_y'] -
-                         last_rows['coord_x'][curr_index]) ** 2)
+                         last_rows['coord_y'][curr_index]) ** 2)
     
             indmin = np.argmin(R)
+            import pdb
+            pdb.set_trace()
+            print(R[indmin])
             # only join trajectories that move at most one worm body
-            if R[indmin] <= last_rows['box_length'][curr_index]:
+            if R[indmin] <= max_allowed_dist*max_frames_gap:
+#last_rows['box_length'][curr_index]:
                 #print(curr_index, indmin)
                 join_frames.append((indmin, curr_index))
     
@@ -360,7 +368,7 @@ def joinGapsTrajectoriesDF(plate_worms,
     
     
     
-    relations_dict, valid_indexes = _findNextTraj(plate_worms, area_ratio_lim, min_track_size, max_frames_gap)
+    relations_dict, valid_indexes = _findNextTraj(plate_worms, area_ratio_lim, min_track_size, max_frames_gap, max_allowed_dist)
     # read the worm_index_blob column, this is the index order that have to
     # be conserved in the worm_index_joined column
     worm_index_blob = plate_worms[worm_index_type].values
@@ -381,12 +389,11 @@ def joinBlobsTrajectories(trajectories_file,
     if not isinstance(area_ratio_lim, (tuple,list)):
         area_ratio_lim = (1/area_ratio_lim, area_ratio_lim)
 
-    
     assignBlobTraj(trajectories_file, max_allowed_dist, area_ratio_lim)
     if analysis_type == 'WT2':
         correctSingleWormCase(trajectories_file)
     else:
-        joinGapsTrajectories(trajectories_file, min_track_size, max_frames_gap, area_ratio_lim)
+        joinGapsTrajectories(trajectories_file, min_track_size, max_frames_gap, area_ratio_lim, max_allowed_dist)
 
     with tables.File(trajectories_file, "r+") as traj_fid:
         traj_fid.get_node('/plate_worms')._v_attrs['has_finished'] = 2
