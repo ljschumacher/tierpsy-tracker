@@ -212,20 +212,12 @@ def getSmoothedTraj(trajectories_file,
     
 def saveTrajData(trajectories_data, masked_image_file, skeletons_file):
     #save data into the skeletons file
-    try:
-        with tables.File(skeletons_file, "a") as ske_file_id:
-            trajectories_data_f = ske_file_id.create_table(
-                '/',
-                'trajectories_data',
-                obj=trajectories_data.to_records(index=False),
-                filters=TABLE_FILTERS)
-    except tables.exceptions.NodeError:
-        with tables.File(skeletons_file, "r+") as ske_file_id:
-            trajectories_data_f = ske_file_id.create_table(
-                '/',
-                'trajectories_data',
-                obj=trajectories_data.to_records(index=False),
-                filters=TABLE_FILTERS)
+    with tables.File(skeletons_file, "a") as ske_file_id:
+        trajectories_data_f = ske_file_id.create_table(
+            '/',
+            'trajectories_data',
+            obj=trajectories_data.to_records(index=False),
+            filters=TABLE_FILTERS)
 
         plate_worms = ske_file_id.get_node('/plate_worms')
         if 'bgnd_param' in plate_worms._v_attrs:
